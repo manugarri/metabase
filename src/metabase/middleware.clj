@@ -99,11 +99,15 @@
   [session-id]
   (let [init-status (init-status/complete?)]
     (if (and session-id init-status)
-      (when-let [session (session-with-id session-id)]
-        (when-not (session-expired? session)
-          (println "Binding a user metabase-user-id for " (:user_id session))
-          {:metabase-user-id (:user_id session)
-           :is-superuser?    (:is_superuser session)}))
+      (if-let [session (session-with-id session-id)]
+        (if-not (session-expired? session)
+          (do (println "Binding a user metabase-user-id for " (:user_id session))
+              {:metabase-user-id (:user_id session)
+               :is-superuser?    (:is_superuser session)})
+          (do (println "Session expired, session age" (when-let [^java.util.Date created-at (:created_at session)]
+                                                        (.getTime created-at))
+                       "Max session age is "      (config/config-int :max-session-age))))
+        (do (println "Had a session-id of " session-id "and inited, but no session with id found" )))
       (do
         (println "Either no session id or not initialized, session id" session-id
                  "and init-status" init-status)))))
