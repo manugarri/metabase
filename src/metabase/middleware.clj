@@ -69,7 +69,9 @@
   (comp handler (fn [{:keys [cookies headers] :as request}]
                   (if-let [session-id (or (get-in cookies [metabase-session-cookie :value])
                                           (headers metabase-session-header))]
-                    (assoc request :metabase-session-id session-id)
+                    (do
+                      (println "attaching session id" session-id)
+                      (assoc request :metabase-session-id session-id))
                     request))))
 
 (defn- session-with-id
@@ -95,11 +97,16 @@
 (defn- current-user-info-for-session
   "Return User ID and superuser status for Session with SESSION-ID if it is valid and not expired."
   [session-id]
-  (when (and session-id (init-status/complete?))
-    (when-let [session (session-with-id session-id)]
-      (when-not (session-expired? session)
-        {:metabase-user-id (:user_id session)
-         :is-superuser?    (:is_superuser session)}))))
+  (let [init-status (init-status/complete?)]
+    (if (and session-id init-status)
+      (when-let [session (session-with-id session-id)]
+        (when-not (session-expired? session)
+          (println "Binding a user metabase-user-id for " (:user_id session))
+          {:metabase-user-id (:user_id session)
+           :is-superuser?    (:is_superuser session)}))
+      (do
+        (println "Either no session id or not initialized, session id" session-id
+                 "and init-status" init-status)))))
 
 (defn- add-current-user-info [{:keys [metabase-session-id], :as request}]
   (merge request (current-user-info-for-session metabase-session-id)))
@@ -114,6 +121,7 @@
   "Middleware that returns a 401 response if REQUEST has no associated `:metabase-user-id`."
   [handler]
   (fn [{:keys [metabase-user-id] :as request}]
+    (println "What's my metabase-user-id" metabase-user-id)
     (if metabase-user-id
       (handler request)
       response-unauthentic)))

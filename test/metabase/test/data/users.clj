@@ -128,11 +128,14 @@
 (defonce ^:private tokens (atom {}))
 
 (defn- username->token [username]
-  (or (@tokens username)
-      (u/prog1 (http/authenticate (user->credentials username))
-        (swap! tokens assoc username <>))
-      (throw (Exception. (format "Authentication failed for %s with credentials %s"
-                                 username (user->credentials username))))))
+  (let [token (@tokens username)]
+    (when token (println "The token in the atom" token))
+    (or token
+     (u/prog1 (http/authenticate (user->credentials username))
+       (println "Just authenticated a user" <>)
+       (swap! tokens assoc username <>))
+     (throw (Exception. (format "Authentication failed for %s with credentials %s"
+                                username (user->credentials username)))))))
 
 (defn- client-fn [username & args]
   (try
